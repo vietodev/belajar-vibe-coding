@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1789314028744,
+      "tag": "0000_tidy_fat_cobra",
+      "breakpoints": true
+    }
+  ]
+}
