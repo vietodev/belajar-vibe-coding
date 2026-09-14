@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { UserRegistrationError } from "./users-service";
+import { UserLoginError, UserRegistrationError } from "./users-service";
 
 const mockSelect = mock();
 const mockInsertValues = mock();
@@ -61,5 +61,51 @@ describe("Users Service (registerUser)", () => {
     expect(insertedValues.email).toBe("vieto@localhost");
     expect(insertedValues.password).not.toBe("rahasia");
     expect(await Bun.password.verify("rahasia", insertedValues.password)).toBe(true);
+  });
+});
+
+describe("Users Service (loginUser)", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockInsertValues.mockReset();
+  });
+
+  it("throws UserLoginError when email is not found", async () => {
+    mockSelect.mockResolvedValueOnce([]);
+
+    const { loginUser } = await import("./users-service");
+
+    await expect(
+      loginUser({ email: "notfound@localhost", password: "rahasia" })
+    ).rejects.toThrow("Email atau password salah");
+  });
+
+  it("throws UserLoginError when password is wrong", async () => {
+    const hashedPassword = await Bun.password.hash("passwordbenar");
+    mockSelect.mockResolvedValueOnce([{ id: 1, password: hashedPassword }]);
+
+    const { loginUser } = await import("./users-service");
+
+    await expect(
+      loginUser({ email: "vieto@localhost", password: "passwordsalah" })
+    ).rejects.toThrow("Email atau password salah");
+  });
+
+  it("returns a UUID token and saves session when credentials are valid", async () => {
+    const hashedPassword = await Bun.password.hash("rahasia");
+    mockSelect.mockResolvedValueOnce([{ id: 5, password: hashedPassword }]);
+    mockInsertValues.mockResolvedValueOnce([{ insertId: 1 }]);
+
+    const { loginUser } = await import("./users-service");
+
+    const result = await loginUser({ email: "vieto@localhost", password: "rahasia" });
+
+    expect(result.data).toBeString();
+    expect(result.data).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+
+    expect(mockInsertValues).toHaveBeenCalledTimes(1);
+    const insertedSession = mockInsertValues.mock.calls[0][0];
+    expect(insertedSession.token).toBe(result.data);
+    expect(insertedSession.userId).toBe(5);
   });
 });

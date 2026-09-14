@@ -15,6 +15,13 @@
       "when": 1789383078615,
       "tag": "0001_peaceful_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1789386998081,
+      "tag": "0002_vengeful_pandemic",
+      "breakpoints": true
     }
   ]
 }
