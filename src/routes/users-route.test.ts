@@ -82,3 +82,85 @@ describe("Users Route (POST /api/register)", () => {
     expect(response.status).toBe(422);
   });
 });
+
+describe("Users Route (POST /api/users/login)", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockInsertValues.mockReset();
+  });
+
+  it("returns { data: token } with status 200 when login is successful", async () => {
+    const hashedPassword = await Bun.password.hash("rahasia");
+    mockSelect.mockResolvedValueOnce([{ id: 1, password: hashedPassword }]);
+    mockInsertValues.mockResolvedValueOnce([{ insertId: 1 }]);
+
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "vieto@localhost",
+          password: "rahasia",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const json = await response.json() as { data: string };
+    expect(json.data).toBeString();
+    expect(json.data).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+  });
+
+  it("returns { error: 'Email atau password salah' } with status 401 when email is not found", async () => {
+    mockSelect.mockResolvedValueOnce([]);
+
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "notfound@localhost",
+          password: "rahasia",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(401);
+    const json = await response.json();
+    expect(json).toEqual({ error: "Email atau password salah" });
+  });
+
+  it("returns { error: 'Email atau password salah' } with status 401 when password is wrong", async () => {
+    const hashedPassword = await Bun.password.hash("passwordbenar");
+    mockSelect.mockResolvedValueOnce([{ id: 1, password: hashedPassword }]);
+
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "vieto@localhost",
+          password: "passwordsalah",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(401);
+    const json = await response.json();
+    expect(json).toEqual({ error: "Email atau password salah" });
+  });
+
+  it("returns error with status 422 when required fields are missing", async () => {
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "vieto@localhost",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(422);
+  });
+});
