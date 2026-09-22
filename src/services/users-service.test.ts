@@ -3,6 +3,7 @@ import { UserLoginError, UserRegistrationError } from "./users-service";
 
 const mockSelect = mock();
 const mockInsertValues = mock();
+const mockUpdateSet = mock();
 
 mock.module("../db", () => {
   return {
@@ -17,6 +18,11 @@ mock.module("../db", () => {
       insert: () => ({
         values: (...args: any[]) => mockInsertValues(...args),
       }),
+      update: () => ({
+        set: () => ({
+          where: (...args: any[]) => mockUpdateSet(...args),
+        }),
+      }),
     },
   };
 });
@@ -25,6 +31,7 @@ describe("Users Service (registerUser)", () => {
   beforeEach(() => {
     mockSelect.mockReset();
     mockInsertValues.mockReset();
+    mockUpdateSet.mockReset();
   });
 
   it("throws UserRegistrationError when email is already registered", async () => {
@@ -68,6 +75,7 @@ describe("Users Service (loginUser)", () => {
   beforeEach(() => {
     mockSelect.mockReset();
     mockInsertValues.mockReset();
+    mockUpdateSet.mockReset();
   });
 
   it("throws UserLoginError when email is not found", async () => {
@@ -95,6 +103,7 @@ describe("Users Service (loginUser)", () => {
     const hashedPassword = await Bun.password.hash("rahasia");
     mockSelect.mockResolvedValueOnce([{ id: 5, password: hashedPassword }]);
     mockInsertValues.mockResolvedValueOnce([{ insertId: 1 }]);
+    mockUpdateSet.mockResolvedValueOnce([]);
 
     const { loginUser } = await import("./users-service");
 
@@ -107,5 +116,39 @@ describe("Users Service (loginUser)", () => {
     const insertedSession = mockInsertValues.mock.calls[0][0];
     expect(insertedSession.token).toBe(result.data);
     expect(insertedSession.userId).toBe(5);
+  });
+});
+
+describe("Users Service (getCurrentUser)", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+  });
+
+  it("returns null when empty token is passed", async () => {
+    const { getCurrentUser } = await import("./users-service");
+    const user = await getCurrentUser("");
+    expect(user).toBeNull();
+  });
+
+  it("returns user details when token is valid and found", async () => {
+    const fakeUser = {
+      id: 1,
+      name: "Vieto",
+      email: "vieto@localhost",
+      created_at: new Date("2026-01-01T00:00:00Z"),
+    };
+    mockSelect.mockResolvedValueOnce([fakeUser]);
+
+    const { getCurrentUser } = await import("./users-service");
+    const user = await getCurrentUser("valid-token");
+    expect(user).toEqual(fakeUser);
+  });
+
+  it("returns null when token is not found in database", async () => {
+    mockSelect.mockResolvedValueOnce([]);
+
+    const { getCurrentUser } = await import("./users-service");
+    const user = await getCurrentUser("invalid-token");
+    expect(user).toBeNull();
   });
 });
