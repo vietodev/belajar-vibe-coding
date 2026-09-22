@@ -76,7 +76,30 @@ export const loginUser = async (payload: LoginUserInput) => {
     userId: user.id,
   });
 
+  await db.update(users).set({ token }).where(eq(users.id, user.id));
+
   return {
     data: token,
   };
 };
+
+export async function getCurrentUser(token: string) {
+  if (!token) return null;
+
+  const result = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      created_at: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.token, token))
+    .limit(1);
+
+  if (result.length === 0) {
+    return null;
+  }
+
+  return result[0];
+}

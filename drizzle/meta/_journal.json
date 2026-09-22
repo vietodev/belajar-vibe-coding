@@ -22,6 +22,13 @@
       "when": 1789386998081,
       "tag": "0002_vengeful_pandemic",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1790078850545,
+      "tag": "0003_blue_black_tarantula",
+      "breakpoints": true
     }
   ]
 }

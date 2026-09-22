@@ -3,6 +3,7 @@ import { usersRoute } from "./users-route";
 
 const mockSelect = mock();
 const mockInsertValues = mock();
+const mockUpdateSet = mock();
 
 mock.module("../db", () => {
   return {
@@ -17,6 +18,11 @@ mock.module("../db", () => {
       insert: () => ({
         values: (...args: any[]) => mockInsertValues(...args),
       }),
+      update: () => ({
+        set: () => ({
+          where: (...args: any[]) => mockUpdateSet(...args),
+        }),
+      }),
     },
   };
 });
@@ -25,6 +31,7 @@ describe("Users Route (POST /api/register)", () => {
   beforeEach(() => {
     mockSelect.mockReset();
     mockInsertValues.mockReset();
+    mockUpdateSet.mockReset();
   });
 
   it("returns { data: 'OK' } when registration is successful", async () => {
@@ -87,12 +94,14 @@ describe("Users Route (POST /api/users/login)", () => {
   beforeEach(() => {
     mockSelect.mockReset();
     mockInsertValues.mockReset();
+    mockUpdateSet.mockReset();
   });
 
   it("returns { data: token } with status 200 when login is successful", async () => {
     const hashedPassword = await Bun.password.hash("rahasia");
     mockSelect.mockResolvedValueOnce([{ id: 1, password: hashedPassword }]);
     mockInsertValues.mockResolvedValueOnce([{ insertId: 1 }]);
+    mockUpdateSet.mockResolvedValueOnce([]);
 
     const response = await usersRoute.handle(
       new Request("http://localhost/api/users/login", {
@@ -106,7 +115,7 @@ describe("Users Route (POST /api/users/login)", () => {
     );
 
     expect(response.status).toBe(200);
-    const json = await response.json() as { data: string };
+    const json = (await response.json()) as { data: string };
     expect(json.data).toBeString();
     expect(json.data).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   });
@@ -162,5 +171,70 @@ describe("Users Route (POST /api/users/login)", () => {
     );
 
     expect(response.status).toBe(422);
+  });
+});
+
+describe("Users Route (POST /api/users/current)", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+  });
+
+  it("returns current user data when valid bearer token is provided", async () => {
+    const fakeUser = {
+      id: 1,
+      name: "Vieto",
+      email: "vieto@localhost",
+      created_at: new Date("2026-01-01T00:00:00Z"),
+    };
+    mockSelect.mockResolvedValueOnce([fakeUser]);
+
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/users/current", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer valid-token-123",
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const json = await response.json();
+    expect(json).toEqual({
+      data: {
+        id: 1,
+        name: "Vieto",
+        email: "vieto@localhost",
+        created_at: "2026-01-01T00:00:00.000Z",
+      },
+    });
+  });
+
+  it("returns { error: 'Unauthorized' } with status 401 when Authorization header is missing", async () => {
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/users/current", {
+        method: "POST",
+      })
+    );
+
+    expect(response.status).toBe(401);
+    const json = await response.json();
+    expect(json).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns { error: 'Unauthorized' } with status 401 when token is invalid/not found", async () => {
+    mockSelect.mockResolvedValueOnce([]);
+
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/users/current", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer invalid-token",
+        },
+      })
+    );
+
+    expect(response.status).toBe(401);
+    const json = await response.json();
+    expect(json).toEqual({ error: "Unauthorized" });
   });
 });
