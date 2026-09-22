@@ -7,27 +7,35 @@ const mockUpdateSet = mock();
 const mockDeleteWhere = mock();
 
 mock.module("../db", () => {
-  return {
-    db: {
-      select: () => ({
-        from: () => ({
+  const dbObj = {
+    select: () => ({
+      from: () => ({
+        innerJoin: () => ({
           where: () => ({
             limit: (...args: any[]) => mockSelect(...args),
           }),
         }),
-      }),
-      insert: () => ({
-        values: (...args: any[]) => mockInsertValues(...args),
-      }),
-      update: () => ({
-        set: () => ({
-          where: (...args: any[]) => mockUpdateSet(...args),
+        where: () => ({
+          limit: (...args: any[]) => mockSelect(...args),
         }),
       }),
-      delete: () => ({
-        where: (...args: any[]) => mockDeleteWhere(...args),
+    }),
+    insert: () => ({
+      values: (...args: any[]) => mockInsertValues(...args),
+    }),
+    update: () => ({
+      set: () => ({
+        where: (...args: any[]) => mockUpdateSet(...args),
       }),
-    },
+    }),
+    delete: () => ({
+      where: (...args: any[]) => mockDeleteWhere(...args),
+    }),
+    transaction: async (cb: any) => cb(dbObj),
+  };
+
+  return {
+    db: dbObj,
   };
 });
 

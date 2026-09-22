@@ -100,8 +100,9 @@ export async function getCurrentUser(token: string) {
       email: users.email,
       created_at: users.createdAt,
     })
-    .from(users)
-    .where(eq(users.token, token))
+    .from(sessions)
+    .innerJoin(users, eq(sessions.userId, users.id))
+    .where(eq(sessions.token, token))
     .limit(1);
 
   if (result.length === 0) {
@@ -116,20 +117,22 @@ export const logoutUser = async (token: string) => {
     throw new UserLogoutError("Unauthorized");
   }
 
-  const existingSession = await db
-    .select({ id: sessions.id })
-    .from(sessions)
-    .where(eq(sessions.token, token))
-    .limit(1);
+  return await db.transaction(async (tx) => {
+    const existingSession = await tx
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(eq(sessions.token, token))
+      .limit(1);
 
-  if (existingSession.length === 0) {
-    throw new UserLogoutError("Unauthorized");
-  }
+    if (existingSession.length === 0) {
+      throw new UserLogoutError("Unauthorized");
+    }
 
-  await db.delete(sessions).where(eq(sessions.token, token));
-  await db.update(users).set({ token: null }).where(eq(users.token, token));
+    await tx.delete(sessions).where(eq(sessions.token, token));
+    await tx.update(users).set({ token: null }).where(eq(users.token, token));
 
-  return {
-    data: "OK",
-  };
+    return {
+      data: "OK",
+    };
+  });
 };
