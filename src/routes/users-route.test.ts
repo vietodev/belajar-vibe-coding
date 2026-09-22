@@ -4,26 +4,38 @@ import { usersRoute } from "./users-route";
 const mockSelect = mock();
 const mockInsertValues = mock();
 const mockUpdateSet = mock();
+const mockDeleteWhere = mock();
 
 mock.module("../db", () => {
-  return {
-    db: {
-      select: () => ({
-        from: () => ({
+  const dbObj = {
+    select: () => ({
+      from: () => ({
+        innerJoin: () => ({
           where: () => ({
             limit: (...args: any[]) => mockSelect(...args),
           }),
         }),
-      }),
-      insert: () => ({
-        values: (...args: any[]) => mockInsertValues(...args),
-      }),
-      update: () => ({
-        set: () => ({
-          where: (...args: any[]) => mockUpdateSet(...args),
+        where: () => ({
+          limit: (...args: any[]) => mockSelect(...args),
         }),
       }),
-    },
+    }),
+    insert: () => ({
+      values: (...args: any[]) => mockInsertValues(...args),
+    }),
+    update: () => ({
+      set: () => ({
+        where: (...args: any[]) => mockUpdateSet(...args),
+      }),
+    }),
+    delete: () => ({
+      where: (...args: any[]) => mockDeleteWhere(...args),
+    }),
+    transaction: async (cb: any) => cb(dbObj),
+  };
+
+  return {
+    db: dbObj,
   };
 });
 
@@ -227,6 +239,62 @@ describe("Users Route (POST /api/users/current)", () => {
     const response = await usersRoute.handle(
       new Request("http://localhost/api/users/current", {
         method: "POST",
+        headers: {
+          Authorization: "Bearer invalid-token",
+        },
+      })
+    );
+
+    expect(response.status).toBe(401);
+    const json = await response.json();
+    expect(json).toEqual({ error: "Unauthorized" });
+  });
+});
+
+describe("Users Route (DELETE /api/users/current)", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockDeleteWhere.mockReset();
+    mockUpdateSet.mockReset();
+  });
+
+  it("returns { data: 'OK' } with status 200 when logout is successful", async () => {
+    mockSelect.mockResolvedValueOnce([{ id: 1 }]); // mock session exists
+    mockDeleteWhere.mockResolvedValueOnce([]);
+    mockUpdateSet.mockResolvedValueOnce([]);
+
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/users/current", {
+        method: "DELETE",
+        headers: {
+          Authorization: "Bearer valid-token-123",
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const json = await response.json();
+    expect(json).toEqual({ data: "OK" });
+  });
+
+  it("returns { error: 'Unauthorized' } with status 401 when Authorization header is missing", async () => {
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/users/current", {
+        method: "DELETE",
+      })
+    );
+
+    expect(response.status).toBe(401);
+    const json = await response.json();
+    expect(json).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns { error: 'Unauthorized' } with status 401 when token is invalid/not found", async () => {
+    mockSelect.mockResolvedValueOnce([]); // mock session not found
+
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/users/current", {
+        method: "DELETE",
         headers: {
           Authorization: "Bearer invalid-token",
         },

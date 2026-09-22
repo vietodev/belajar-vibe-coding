@@ -4,26 +4,38 @@ import { UserLoginError, UserRegistrationError } from "./users-service";
 const mockSelect = mock();
 const mockInsertValues = mock();
 const mockUpdateSet = mock();
+const mockDeleteWhere = mock();
 
 mock.module("../db", () => {
-  return {
-    db: {
-      select: () => ({
-        from: () => ({
+  const dbObj = {
+    select: () => ({
+      from: () => ({
+        innerJoin: () => ({
           where: () => ({
             limit: (...args: any[]) => mockSelect(...args),
           }),
         }),
-      }),
-      insert: () => ({
-        values: (...args: any[]) => mockInsertValues(...args),
-      }),
-      update: () => ({
-        set: () => ({
-          where: (...args: any[]) => mockUpdateSet(...args),
+        where: () => ({
+          limit: (...args: any[]) => mockSelect(...args),
         }),
       }),
-    },
+    }),
+    insert: () => ({
+      values: (...args: any[]) => mockInsertValues(...args),
+    }),
+    update: () => ({
+      set: () => ({
+        where: (...args: any[]) => mockUpdateSet(...args),
+      }),
+    }),
+    delete: () => ({
+      where: (...args: any[]) => mockDeleteWhere(...args),
+    }),
+    transaction: async (cb: any) => cb(dbObj),
+  };
+
+  return {
+    db: dbObj,
   };
 });
 
@@ -150,5 +162,38 @@ describe("Users Service (getCurrentUser)", () => {
     const { getCurrentUser } = await import("./users-service");
     const user = await getCurrentUser("invalid-token");
     expect(user).toBeNull();
+  });
+});
+
+describe("Users Service (logoutUser)", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockDeleteWhere.mockReset();
+    mockUpdateSet.mockReset();
+  });
+
+  it("throws UserLogoutError when token is empty", async () => {
+    const { logoutUser } = await import("./users-service");
+    await expect(logoutUser("")).rejects.toThrow("Unauthorized");
+  });
+
+  it("throws UserLogoutError when session is not found", async () => {
+    mockSelect.mockResolvedValueOnce([]); // session not found
+    
+    const { logoutUser } = await import("./users-service");
+    await expect(logoutUser("invalid-token")).rejects.toThrow("Unauthorized");
+  });
+
+  it("deletes session and returns OK when token is valid", async () => {
+    mockSelect.mockResolvedValueOnce([{ id: 1 }]); // session found
+    mockDeleteWhere.mockResolvedValueOnce([]);
+    mockUpdateSet.mockResolvedValueOnce([]);
+
+    const { logoutUser } = await import("./users-service");
+    const result = await logoutUser("valid-token");
+
+    expect(result).toEqual({ data: "OK" });
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
   });
 });

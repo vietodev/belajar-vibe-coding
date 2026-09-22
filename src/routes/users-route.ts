@@ -4,7 +4,9 @@ import {
   loginUser,
   registerUser,
   UserLoginError,
+  UserLogoutError,
   UserRegistrationError,
+  logoutUser,
 } from "../services/users-service";
 
 export const usersRoute = new Elysia()
@@ -80,4 +82,30 @@ export const usersRoute = new Elysia()
         created_at: user.created_at,
       },
     };
+  })
+  .delete("/api/users/current", async ({ headers, set }) => {
+    const authHeader = headers["authorization"];
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      set.status = 401;
+      return { error: "Unauthorized" };
+    }
+
+    const token = authHeader.substring(7).trim();
+    if (!token) {
+      set.status = 401;
+      return { error: "Unauthorized" };
+    }
+
+    try {
+      const result = await logoutUser(token);
+      set.status = 200;
+      return result;
+    } catch (error) {
+      if (error instanceof UserLogoutError) {
+        set.status = 401;
+        return { error: error.message };
+      }
+      set.status = 500;
+      return { error: "Terjadi kesalahan internal pada server" };
+    }
   });

@@ -27,6 +27,13 @@ export class UserLoginError extends Error {
   }
 }
 
+export class UserLogoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UserLogoutError";
+  }
+}
+
 export const registerUser = async (payload: RegisterUserInput) => {
   const existingUser = await db
     .select({ id: users.id })
@@ -93,8 +100,9 @@ export async function getCurrentUser(token: string) {
       email: users.email,
       created_at: users.createdAt,
     })
-    .from(users)
-    .where(eq(users.token, token))
+    .from(sessions)
+    .innerJoin(users, eq(sessions.userId, users.id))
+    .where(eq(sessions.token, token))
     .limit(1);
 
   if (result.length === 0) {
@@ -103,3 +111,28 @@ export async function getCurrentUser(token: string) {
 
   return result[0];
 }
+
+export const logoutUser = async (token: string) => {
+  if (!token) {
+    throw new UserLogoutError("Unauthorized");
+  }
+
+  return await db.transaction(async (tx) => {
+    const existingSession = await tx
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(eq(sessions.token, token))
+      .limit(1);
+
+    if (existingSession.length === 0) {
+      throw new UserLogoutError("Unauthorized");
+    }
+
+    await tx.delete(sessions).where(eq(sessions.token, token));
+    await tx.update(users).set({ token: null }).where(eq(users.token, token));
+
+    return {
+      data: "OK",
+    };
+  });
+};
