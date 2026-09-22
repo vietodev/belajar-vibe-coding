@@ -27,6 +27,13 @@ export class UserLoginError extends Error {
   }
 }
 
+export class UserLogoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UserLogoutError";
+  }
+}
+
 export const registerUser = async (payload: RegisterUserInput) => {
   const existingUser = await db
     .select({ id: users.id })
@@ -103,3 +110,26 @@ export async function getCurrentUser(token: string) {
 
   return result[0];
 }
+
+export const logoutUser = async (token: string) => {
+  if (!token) {
+    throw new UserLogoutError("Unauthorized");
+  }
+
+  const existingSession = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(eq(sessions.token, token))
+    .limit(1);
+
+  if (existingSession.length === 0) {
+    throw new UserLogoutError("Unauthorized");
+  }
+
+  await db.delete(sessions).where(eq(sessions.token, token));
+  await db.update(users).set({ token: null }).where(eq(users.token, token));
+
+  return {
+    data: "OK",
+  };
+};
