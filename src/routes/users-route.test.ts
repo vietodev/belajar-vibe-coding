@@ -100,6 +100,54 @@ describe("Users Route (POST /api/register)", () => {
 
     expect(response.status).toBe(422);
   });
+
+  it("returns error with status 422 when name exceeds 255 characters", async () => {
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "a".repeat(256),
+          email: "test@localhost",
+          password: "password123",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(422);
+  });
+
+  it("returns error with status 422 when email exceeds 255 characters", async () => {
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Vieto",
+          email: `${"a".repeat(250)}@test.com`,
+          password: "password123",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(422);
+  });
+
+  it("returns error with status 422 when password exceeds 255 characters", async () => {
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Vieto",
+          email: "test@localhost",
+          password: "p".repeat(256),
+        }),
+      })
+    );
+
+    expect(response.status).toBe(422);
+  });
 });
 
 describe("Users Route (POST /api/users/login)", () => {
@@ -178,6 +226,21 @@ describe("Users Route (POST /api/users/login)", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: "vieto@localhost",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(422);
+  });
+
+  it("returns error with status 422 when email or password exceeds 255 characters", async () => {
+    const response = await usersRoute.handle(
+      new Request("http://localhost/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: `${"a".repeat(250)}@test.com`,
+          password: "password123",
         }),
       })
     );

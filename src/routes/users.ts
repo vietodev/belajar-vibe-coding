@@ -14,7 +14,7 @@ export const userRoutes = new Elysia({ prefix: "/users" })
     },
     {
       body: t.Object({
-        name: t.String(),
+        name: t.String({ minLength: 1, maxLength: 255 }),
       }),
     }
   );
